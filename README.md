@@ -120,6 +120,8 @@ if __name__ == "__main__":
 
 ```
 
+You can set ```recalculate_zonedata(distribute_using_building_data=False)``` if you do not want to use the Ryhti API to distribute data to the split zones, and instead distribute based on CORINE Landcover data. This may be useful when dealing with predicted population data in areas where buildings have not yet been built.
+
 A common issue that may emerge is that a GeoPandas function turns the EmmeNetwork object into a GeoDataFrame object. Please notify of these issues or create a pull request fixing the issue. In the mean time, you can reassign the variable like this:
 
 ```python

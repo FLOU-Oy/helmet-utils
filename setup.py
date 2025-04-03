@@ -14,11 +14,9 @@ setup(
         'geopandas',
         'tabulate',
         'httpx',
-        'rasterio'
+        'rasterio',
+        'rasterstats',
+        'rtree',
+        'requests'
     ],
-    extras_require={
-        'zonedata': [
-            'rasterstats'
-        ]
-    }
 )

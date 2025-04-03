@@ -18,10 +18,9 @@ def add_height_data(scenario_folder: str, api_key: str, processors: int, output_
 
     print(f"Height data added to network. Updated network saved to {output_folder or f'updated_{scenario_reader.input_folder}'}")
 
-def recalculate_zone_data(zonedata_folder:str, split_areas:bool, area_changes=None, output_folder: str = None, network_folder:str = None, zones:str=None, landcover:str=None):
+def recalculate_zone_data(zonedata_folder:str, split_areas:bool, area_changes=None, output_folder: str = None, network_folder:str = None, zones:str=None, landcover:str=None, use_landcover:bool=False):
     zonedata = zonedata_reader.get_helmet_zonedata(zonedata_folder, zones_filepath=zones, landcover_filepath=landcover)
-    # zonedata.recalculate_zonedata(output_path="2023_test_output", area_changes={292:[292, 295]}, split_areas=True)
-    zonedata.recalculate_zonedata(output_path=output_folder, split_areas=split_areas, area_changes=area_changes, network_folder=network_folder)
+    zonedata.recalculate_zonedata(output_path=output_folder, split_areas=split_areas, area_changes=area_changes, network_folder=network_folder,distribute_using_building_data=not use_landcover)
 
 
 def main():
@@ -39,6 +38,9 @@ def main():
     parser_recalculate_zonedata = subparsers.add_parser("recalculate_zonedata", help="Recalculate zonedata based on provided inputs")
     parser_recalculate_zonedata.add_argument("-d", "--zonedata_folder", type=str, required=True, help="Path to the original zonedata folder for a specific year")
     parser_recalculate_zonedata.add_argument("-o", "--output_folder", type=str, help="Folder to save the recalculated zonedata")
+    parser_recalculate_zonedata.add_argument("-l", "--landcover", type=str, help="Path to the landcover data file")
+    parser_recalculate_zonedata.add_argument("--do_not_use_buildings", action="store_true", help="Use landcover data instead of building data for recalculating zonedata")
+    
     # If the user wants to split zones, there are two possible methods, either splitting manually and passing in the split zone geometries and changes, or automatically splitting.
     # These two must be used together:
     parser_recalculate_zonedata.add_argument("-z", "--zones", type=str, help=".gpkg file with split zone geometries.")
@@ -65,7 +67,9 @@ def main():
             area_changes=area_changes,
             output_folder=args.output_folder,
             network_folder=args.scenario_folder,
-            zones=args.zones
+            zones=args.zones,
+            landcover=args.landcover,
+            use_landcover=args.landcover
         )
     else:
         parser.print_help()

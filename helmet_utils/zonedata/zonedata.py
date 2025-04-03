@@ -15,16 +15,25 @@ from ..network import scenario_reader
 AREA_MULTIPLIER = 400*0.000001
 
 class ZoneData():
-    def __init__(self, landuse, population, workplace, education, bikes, parking, car, zones, landcover_file):
-        self.landuse = landuse
-        self.population = population
-        self.workplace = workplace
-        self.education = education
+    def __init__(self, landuse, population, workplace, education, bikes, parking, car, car_cost, external, park_and_ride, transit_cost, trucks, zones, landcover_file, file_dict):
         self.bikes = bikes
-        self.zones = zones
-        self.parking = parking
         self.car = car
+        self.car_cost = car_cost
+        self.education = education
+        self.external = external
+        self.landuse = landuse
+        self.parking = parking
+        self.park_and_ride = park_and_ride
+        self.population = population
+        self.transit_cost = transit_cost
+        self.trucks = trucks
+        self.workplace = workplace
+        # Filenames for each data type
+        self.file_dict = file_dict
+        # Additional files, landcover and zone geometries
         self.landcover_file = landcover_file
+        self.zones = zones
+
 
     def get_ryhti_within_zone(self, zone_id):
         # Get the geometry of the specified zone
@@ -51,6 +60,7 @@ class ZoneData():
             gdf = gdf.clip(self.zones[self.zones['SIJ2023']==zone_id])
         else:
             print(f"Failed to fetch data from OGC server. Status code: {response.status_code}")
+            return None
 
         return gdf
     
@@ -58,6 +68,8 @@ class ZoneData():
         floorarea_shares = {}
         for original_zone_id in area_changes.keys():
             buildings = self.get_ryhti_within_zone(original_zone_id)
+            if buildings is None:
+                return None
             total_floorarea = buildings['gross_floor_area'].sum()
             for new_zone_id in area_changes[original_zone_id]:
                 # Get buildings within the sub zone
@@ -71,7 +83,7 @@ class ZoneData():
         return floorarea_shares
 
     
-    def recalculate_zonedata(self, output_path: str, area_changes:Optional[Dict[int, int]] = None, split_areas=False, network_folder: str='', year=2023, split_zones_filename:str=None):
+    def recalculate_zonedata(self, output_path: str, area_changes:Optional[Dict[int, int]] = None, split_areas=False, network_folder: str='', year=2023, split_zones_filename:str=None, distribute_using_building_data=True):
         if split_areas and area_changes:
             print("Cannot split areas with predefined area changes.")
             return
@@ -94,10 +106,15 @@ class ZoneData():
 
         # Calculate landuse according to area splits
         lnd, landuse_changes = self.recalculate_landuse(zones, self.landcover_file, year, area_changes)
-        landuse_changes = self.calculate_floorarea_shares(area_changes, zones)
+        if distribute_using_building_data:
+            floorarea_changes = self.calculate_floorarea_shares(area_changes, zones)
+            if floorarea_changes:
+                landuse_changes = floorarea_changes
+            else:
+                print("The program ran into an issue fetching building data. Using landcover data as a fallback.")
         # Calculate the rest using landuse data
         if area_changes:
-            print("Redistributing population data based on landuse patterns on modified areas.")
+            print("\nRedistributing population data based on landuse patterns on modified areas.")
             print("Only total values are changed, shares will stay the same. Please check that the redistributed values make sense")
             print("Especially .edu will need readjustments")
             pop = self.recalculate_population(landuse_changes)
@@ -143,7 +160,7 @@ class ZoneData():
             raise KeyError("Area changes and zones do not match. Cut zones using a GIS editor, or automatically split areas by setting split_areas=True")
         df['detach'] = original_landuse['detach']
         df = self._calculate_detach_share_for_region(df, area_changes_mapped, original_landuse)
-        df = df[['builtar', 'sportsar', 'detach']]
+        df = df[['builtar', 'landar', 'sportsar', 'detach']]
         df = df.sort_index()
         return df, landuse_changes
 
@@ -300,54 +317,94 @@ class ZoneData():
     def fill_folder(self, lnd:pd.DataFrame, edu: pd.DataFrame, pop: pd.DataFrame, wrk: pd.DataFrame, bks: pd.DataFrame, prk:pd.DataFrame, car:pd.DataFrame, year: int, output_path:str):
         if not os.path.exists(f"{output_path}"):
             os.makedirs(f"{output_path}")
+
+        def custom_format(x):
+            if x > 10000:
+                return f'{x:.0f}'
+            else:
+                return f'{x:.4g}'
         
-        # EDU
-        edu = edu.astype({'compreh': 'int', 'secndry': 'int', 'tertiary': 'int'})
-        f = open(f'{output_path}/{year}.edu', 'w')
-        f.write('# Schools 2023\n#\n# compreh: Students in comprehensive school (1-9)\n# secndry: Students in upper secondary education (gymnasium, vocational)\n# tertiary: Students in tertiary education (university, college, polytechnic)\n#\n')
-        edu.to_csv(f, sep="\t", lineterminator='\n')
-        f.close()
-
-        # POP
-        pop = pop.fillna(0)
-        pop = pop.astype({'total': 'int','sh_7-17': 'float','sh_1829': 'float','sh_3049': 'float','sh_5064': 'float','sh_65-': 'float'})
-        f = open(f'{output_path}/{year}.pop', 'w')
-        f.write('# Population 2023\n#\n# total: total number of residents in zone\n# sh_7-17: share of population aged 7-17\n# sh_1829: share of population aged 18-29\n# sh_3049: share of population aged 30-49\n# sh_5064: share of population aged 50-64\n# sh_65-: share of population aged over 65\n#\n')
-        
-        pop.to_csv(f, float_format='%.4g', sep="\t", lineterminator='\n')
-        f.close()
-
-        # WRK
-        wrk = wrk.fillna(0)
-        wrk = wrk.astype({'total': 'int', 'sh_serv': 'float', 'sh_shop': 'float', 'sh_logi': 'float', 'sh_indu': 'float'})
-        f = open(f'{output_path}/{2022}.wrk', 'w')
-        f.write('# Workplaces 2022\n#\n# total: total number of workplaces in zone\n# sh_serv: service workplaces as share of total number of workplaces\n# sh_shop: retail workplaces as share of total number of workplaces\n# sh_logi: logistics workplaces as share of total number of workplaces\n# sh_indu: industry workplaces as share of total number of workplaces\n#\n')
-        wrk.to_csv(f, float_format='%.4g', sep="\t", lineterminator='\n')
-        f.close()
-
-        # LND
-        f = open(f'{output_path}/{2023}.lnd', 'w')
-        f.write('# Land use 2023\n#\n# builtar: area of built environment\n# sportsar: area of sports or leisure facilities, currently not used in Helmet 5.0\n# detach: detached houses as share of total number of houses\n#\n')
-
-        lnd.to_csv(f, float_format='%.4g', sep="\t", lineterminator='\n')
-        f.close()
-
         # BKS
-        f = open(f'{output_path}/{year}.bks', 'w')
+        f = open(f"{output_path}/{self.file_dict['bks']}", 'w')
         f.write('# Sharebikes 2023\n# rel_capacity: total capacity at stations / zone area\n# rel_stations: number of stations / zone_area\n# operator: operator city or region\n# HE: Helsinki-Espoo\n# VA: Vantaa\n# PO: Porvoo\n# LA: Lahti\n#\n')
         bks.to_csv(f, float_format='%.4g', sep="\t", lineterminator='\n')
         f.close()
 
         # CAR
-        f = open(f'{output_path}/{year}.car', 'w')
-        f.write('# cars of population 31.12.201\n#\n# caruse: share of population that is car main user\n# cardens: cars per inhabitants\n#\n')
+        f = open(f"{output_path}/{self.file_dict['car']}", 'w')
+        f.write('# cars of population 31.12.2017\n#\n# caruse: share of population that is car main user\n# cardens: cars per inhabitants\n#\n')
         car.to_csv(f, float_format='%.4g', sep="\t", lineterminator='\n')
         f.close()
 
+        # CCO
+        f = open(f"{output_path}/{self.file_dict['cco']}", 'w')
+        f.write('# Car usage cost [eur/km]\n#\n')
+        f.write("dist_cost\n")
+        f.write(f'{self.car_cost.iloc[0, 0]:.4g}')
+        f.close()
+
+        # EDU
+        edu = edu.astype({'compreh': 'int', 'secndry': 'int', 'tertiary': 'int'})
+        f = open(f"{output_path}/{self.file_dict['edu']}", 'w')
+        f.write('# Schools 2023\n#\n# compreh: Students in comprehensive school (1-9)\n# secndry: Students in upper secondary education (gymnasium, vocational)\n# tertiary: Students in tertiary education (university, college, polytechnic)\n#\n')
+        edu.to_csv(f, sep="\t", lineterminator='\n')
+        f.close()
+
+        # EXT
+        f = open(f"{output_path}/{self.file_dict['ext']}", 'w')
+        f.write('# External growth\n#\n')
+        self.external.to_csv(f, float_format='%.4g', sep="\t", lineterminator='\n')
+        f.close()
+
+        # LND
+        f = open(f"{output_path}/{self.file_dict['lnd']}", 'w')
+        f.write('# Land use 2023\n#\n# builtar: area of built environment\n# sportsar: area of sports or leisure facilities, currently not used in Helmet 5.0\n# detach: detached houses as share of total number of houses\n#\n')
+        lnd.to_csv(f, float_format='%.4g', sep="\t", lineterminator='\n')
+        f.close()
+
+        # POP
+        pop = pop.fillna(0)
+        pop = pop.astype({'total': 'int','sh_7-17': 'float','sh_1829': 'float','sh_3049': 'float','sh_5064': 'float','sh_65-': 'float'})
+        f = open(f"{output_path}/{self.file_dict['pop']}", 'w')
+        f.write(f'# Population {self.file_dict['pop'].strip('.pop')}\n#\n# total: total number of residents in zone\n# sh_7-17: share of population aged 7-17\n# sh_1829: share of population aged 18-29\n# sh_3049: share of population aged 30-49\n# sh_5064: share of population aged 50-64\n# sh_65-: share of population aged over 65\n#\n')
+        pop.to_csv(f, float_format='%.4g', sep="\t", lineterminator='\n')
+        f.close()
+
+        # PNR
+        f = open(f"{output_path}/{self.file_dict['pnr']}", 'w')
+        f.write('#  Park and ride\n# source: Fintraffic LIIPI\n# cost in euros per 12h\n#\n')
+        self.park_and_ride.to_csv(f, float_format='%.4g', sep="\t", lineterminator='\n')
+        f.close()
+
         # PRK, parking cost in split zones assumed to be the same as before splitting
-        f = open(f'{output_path}/{year}.prk', 'w')
+        f = open(f"{output_path}/{self.file_dict['prk']}", 'w')
         f.write('# parking costs\n#\n# parcosw: parking cost at workplace\n# parcose: parking cost during errand\n#\n')
         prk.to_csv(f, float_format='%.4g', sep="\t", lineterminator='\n')
+        f.close()
+
+        # TCO
+        f = open(f"{output_path}/{self.file_dict['tco']}", 'w')
+        f.write(f'# Transit zone monthly cost {self.file_dict['tco'].strip('.tco')} \n#\n# J: Jarvenpaa\n# N: Nurmijarvi\n# V: Vihti\n# M: Mantsala/Hyvinkaa\n# P: Pornainen\n# DNJMP: Keski-Uudenmaan seutulippu\n# start: Matkahuolto 44 trips start fare\n# dist: Matkahuolto 44 trips distance fare\n#\n')
+        self.transit_cost.to_csv(f, float_format='%.4g', sep="\t", lineterminator='\n')
+        f.close()
+
+        # TRK
+        f = open(f"{output_path}/{self.file_dict['trk']}", 'w')
+        f.write('# Truck allocations 2018\n#\n# Zones where trailer trucks are prohibited\n')
+        for key, value in self.trucks.items():
+            f.write(f'{key}\n')
+            f.write(' '.join(map(str, value)))
+            f.write('\n')
+            if key == 'prohibited_zones':
+                f.write('# Zones were garbage is taken\n')
+        f.close()
+
+        # WRK
+        wrk = wrk.fillna(0)
+        wrk = wrk.astype({'total': 'int', 'sh_serv': 'float', 'sh_shop': 'float', 'sh_logi': 'float', 'sh_indu': 'float'})
+        f = open(f"{output_path}/{self.file_dict['wrk']}", 'w')
+        f.write('# Workplaces 2022\n#\n# total: total number of workplaces in zone\n# sh_serv: service workplaces as share of total number of workplaces\n# sh_shop: retail workplaces as share of total number of workplaces\n# sh_logi: logistics workplaces as share of total number of workplaces\n# sh_indu: industry workplaces as share of total number of workplaces\n#\n')
+        wrk.to_csv(f, float_format='%.4g', sep="\t", lineterminator='\n')
         f.close()
 
         return
@@ -372,8 +429,7 @@ class ZoneData():
         gdf['builtar'] = gdf['builtar'].apply(lambda x: 0.01 if x == 0 else x)  # Avoid division by zero in model system. Builtar might fall to 0 after splitting zones.
         gdf['SIJ2023'] = gdf['SIJ2023'].astype(int)
         gdf = gdf.set_index('SIJ2023').sort_index()
-        # Also include landar in a later version
-        gdf = gdf[['builtar', 'sportsar']]
+        gdf = gdf[['builtar', 'landar', 'sportsar']]
     
         return gdf
 
