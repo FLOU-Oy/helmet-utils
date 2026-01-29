@@ -8,7 +8,7 @@ from shapely.ops import Point
 from tabulate import tabulate
 from .height_data import HeightData
 from pathlib import Path
-import os  # Add this import
+import os
 
 class EmmeNetwork(gpd.GeoDataFrame):
     """
