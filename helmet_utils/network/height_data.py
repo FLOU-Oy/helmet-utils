@@ -93,7 +93,7 @@ class HeightData:
                 future_fourth_quarter = executor.submit(self.process_half_squares, fourth_quarter, self.api_key, not_centroids)
                 process_pool = [future_first_quarter, future_second_quarter, future_third_quarter, future_fourth_quarter]
 
-            print('Processing...', end='\r')
+            print("Processing...", end='\r')
             quarters_done = 0
             updated_points = {}
             for i, future in enumerate(as_completed(process_pool)):
@@ -104,7 +104,7 @@ class HeightData:
                     continue
 
                 if i + 1 > quarters_done:
-                    print(f'Processing... {int((i + 1) * (100 / processors))}% done.', end='\r')
+                    print(f"Processing... {int((i + 1) * (100 / processors))}% done.", end='\r')
                     quarters_done += 1
                     for points in points_with_elevations:
                         updated_points.update(points[1])
