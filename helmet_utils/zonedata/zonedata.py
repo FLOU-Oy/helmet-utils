@@ -150,9 +150,9 @@ class ZoneData():
         df_corine = pd.DataFrame(data=corine)
         # Makes sure that all columns are present, even if some land use types are missing in the data
         if year == 2012:
-            expected_cols = list(range(1, 48))
-        elif year >= 2018:
             expected_cols = list(range(1, 49))
+        elif year >= 2018:
+            expected_cols = list(range(1, 50))
         df_corine = df_corine.reindex(columns=expected_cols, fill_value=0)
 
         landcover = sijoittelualueet.join(df_corine)

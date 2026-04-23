@@ -59,7 +59,7 @@ class ZoneDataReader:
         file = next(Path(directory).glob(pattern), None)
         if file:
             if pattern == '*.cco':
-                 return pd.read_csv(file, sep="\t", comment="#"), str(file)
+                 return pd.read_csv(file, sep="\s+", comment="#"), str(file)
             if pattern == '*.trk':
                 trk_data = {}
                 with open(file, 'r') as f:
@@ -79,11 +79,11 @@ class ZoneDataReader:
 
                 return trk_data, str(file)
             if pattern == '*.tco':
-                return pd.read_csv(file, sep="\t", comment="#", index_col=0, keep_default_na=False, na_values=[]), str(file)
+                return pd.read_csv(file, sep="\s+", comment="#", index_col=0, keep_default_na=False, na_values=[]), str(file)
             else:
-                return pd.read_csv(file, sep="\t", comment="#", index_col=0), str(file)
-        elif pattern == '*.car':
-            print('No car file found, skipping car data')
+                return pd.read_csv(file, sep="\s+", comment="#", index_col=0), str(file)
+        elif pattern == "*.car" or pattern == "*.bks":
+            print(f"No {pattern} file found, skipping {pattern} data")
             return None, None
         else:
             raise FileNotFoundError(f"No file matching pattern {pattern} found in {directory}")    

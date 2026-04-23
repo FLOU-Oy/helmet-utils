@@ -59,7 +59,7 @@ class TransitNetwork():
                     if draw_stops:
                         self.stops[self.stops['Mod'].isin(['t','p'])].explore(m=map, column='Line', legend_kwds={'caption':'Stops'},  marker_kwds={'radius':5})
 
-                    print('No direction specified, printing both directions. Readability can be improved by specifying line direction [1, 2].')
+                    print("No direction specified, printing both directions. Readability can be improved by specifying line direction [1, 2].")
             elif visualization_type=='hsl-bus':
                 if direction:
                     map = self.transit_lines[(self.transit_lines['Mod'].isin(['b'])) & (self.transit_lines['Direction'] == str(direction))].explore(color='blue')
@@ -72,7 +72,7 @@ class TransitNetwork():
                     if draw_stops:
                         self.stops[self.stops['Mod'].isin(['t','p','b','g','j'])].explore(m=map, column='Line', legend_kwds={'caption':'Stops'},  marker_kwds={'radius':5})
 
-                    print('No direction specified, printing both directions. Readability can be improved by specifying line direction [1, 2].')
+                    print("No direction specified, printing both directions. Readability can be improved by specifying line direction [1, 2].")
 
         map.save('map.html')
         webbrowser.open('map.html')
