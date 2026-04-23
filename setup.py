@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='helmet_utils',
-    version='0.4.1',
+    version='0.4.2',
     description='Utilities for the processing and adjusting of data used by Helmet',
     author='Santeri Hiitola | HSL',
     license='EUPL',

@@ -160,21 +160,45 @@ class ZoneData():
         landcover.index.name = None
         return landcover
 
-    def recalculate_landuse(self, zones:gpd.GeoDataFrame, landcover_file: str, year: int=2023, area_changes: Optional[Dict[int, int]] = None):
+    def recalculate_landuse(self, zones:gpd.GeoDataFrame, landcover_file: str, year: int=2023, area_changes: Optional[Dict[int, list[int]]] = None):
         # Corine ids representing built area, then convert squares to km^2
         original_landuse = self.landuse.copy()
-        df = self._read_landcover(zones, landcover_file, 2023)
+        df_new = self._read_landcover(zones, landcover_file, 2023)
 
         area_changes_mapped = {i: int(original) for original, new in area_changes.items() for i in new}
         # Create a dictionary of the form {original_zone_id: [(new_zone_id1, share_of_original_landuse1), (new_zone_id2, share_of_original_landuse2)]}
         try:
-            landuse_changes = {i: (original, df.loc[i, 'builtar']/original_landuse.loc[original, 'builtar']) for original, new in area_changes.items() for i in new}
+            landuse_changes = {}
+
+            for original, new_ids in area_changes.items():
+                if not isinstance(new_ids, (list, tuple, set)):
+                    new_ids = [new_ids]
+
+                new_ids = list(new_ids)
+
+                # Sum built area of all resulting zones
+                new_built_sum = df_new.loc[new_ids, 'builtar'].sum()
+
+                if new_built_sum == 0:
+                    # Fallback: equal split to avoid losing population
+                    share = 1.0 / len(new_ids)
+                    for i in new_ids:
+                        landuse_changes[i] = (original, share)
+                else:
+                    for i in new_ids:
+                        share = df_new.loc[i, 'builtar'] / new_built_sum
+                        landuse_changes[i] = (original, share)
+
         except KeyError:
-            raise KeyError("Area changes and zones do not match. Cut zones using a GIS editor, or automatically split areas by setting split_areas=True")
-        df['detach'] = original_landuse['detach']
-        df = self._calculate_detach_share_for_region(df, area_changes_mapped, original_landuse)
-        df = df[['builtar', 'landar', 'sportsar', 'detach']]
-        df = df.sort_index()
+            raise KeyError(
+                "Area changes and zones do not match. Cut zones using a GIS editor, "
+                "or automatically split areas by setting split_areas=True"
+            )
+
+        df_new['detach'] = original_landuse['detach']
+        df_new = self._calculate_detach_share_for_region(df_new, area_changes_mapped, original_landuse)
+        df_new = df_new[['builtar', 'landar', 'sportsar', 'detach']]
+        df = df_new.sort_index()
         return df, landuse_changes
 
 
@@ -338,10 +362,11 @@ class ZoneData():
                 return f'{x:.4g}'
         
         # BKS
-        f = open(f"{output_path}/{self.file_dict['bks']}", 'w')
-        f.write("# Sharebikes 2023\n# rel_capacity: total capacity at stations / zone area\n# rel_stations: number of stations / zone_area\n# operator: operator city or region\n# HE: Helsinki-Espoo\n# VA: Vantaa\n# PO: Porvoo\n# LA: Lahti\n#\n")
-        bks.to_csv(f, float_format='%.4g', sep="\t", lineterminator='\n')
-        f.close()
+        if bks is not None:
+            f = open(f"{output_path}/{self.file_dict['bks']}", 'w')
+            f.write("# Sharebikes 2023\n# rel_capacity: total capacity at stations / zone area\n# rel_stations: number of stations / zone_area\n# operator: operator city or region\n# HE: Helsinki-Espoo\n# VA: Vantaa\n# PO: Porvoo\n# LA: Lahti\n#\n")
+            bks.to_csv(f, float_format='%.4g', sep="\t", lineterminator='\n')
+            f.close()
 
         # CAR
         if car is not None:
