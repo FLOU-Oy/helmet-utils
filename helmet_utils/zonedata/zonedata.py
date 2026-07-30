@@ -120,8 +120,11 @@ class ZoneData():
             pop = self.recalculate_population(landuse_changes)
             wrk = self.recalculate_workplace(landuse_changes)
             edu = self.recalculate_education(landuse_changes)
-            bks = self.recalculate_bikes(landuse_changes)
-            if self.car:
+            if self.bikes is not None:
+                bks = self.recalculate_bikes(landuse_changes)
+            else:
+                bks = None
+            if self.car is not None:
                 car = self.recalculate_cars(landuse_changes)
             else:
                 car = None
@@ -130,8 +133,11 @@ class ZoneData():
             pop = self.population
             wrk = self.workplace
             edu = self.education
-            bks = self.bikes
-            if self.car:
+            if self.bikes is not None:
+                bks = self.bikes
+            else:
+                bks = None
+            if self.car is not None:
                 car = self.car
             else:
                 car = None
@@ -351,7 +357,7 @@ class ZoneData():
 
         return split_zones_gdf
 
-    def fill_folder(self, lnd:pd.DataFrame, edu: pd.DataFrame, pop: pd.DataFrame, wrk: pd.DataFrame, bks: pd.DataFrame, prk:pd.DataFrame, car:pd.DataFrame|None, year: int, output_path:str):
+    def fill_folder(self, lnd:pd.DataFrame, edu: pd.DataFrame, pop: pd.DataFrame, wrk: pd.DataFrame, bks: pd.DataFrame|None, prk:pd.DataFrame, car:pd.DataFrame|None, year: int, output_path:str):
         if not os.path.exists(f"{output_path}"):
             os.makedirs(f"{output_path}")
 

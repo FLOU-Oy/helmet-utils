@@ -1,11 +1,11 @@
 import pandas as pd
 import geopandas as gpd
 from pathlib import Path
-from typing import Optional, Dict, Tuple
+from typing import Tuple
 from .zonedata import ZoneData
 
 class ZoneDataReader:
-    def __init__(self, zonedata_directory: str, zones_filepath: str=None, landcover_filepath: str=None):
+    def __init__(self, zonedata_directory: str, zones_filepath: str|None=None, landcover_filepath: str|None=None):
         if not Path(zonedata_directory).exists():
             raise FileNotFoundError(f"Directory {zonedata_directory} does not exist.")
         if zones_filepath and not Path(zones_filepath).exists():
@@ -55,7 +55,7 @@ class ZoneDataReader:
 
         return ZoneData(self.lnd, self.pop, self.wrk, self.edu, self.bks, self.prk, self.car, self.cco, self.ext, self.pnr, self.tco, self.trk, self.zones, self.landcover_file, file_dict)
     
-    def _extract_df_from_zonedata(self, directory: str, pattern: str) -> Tuple[pd.DataFrame, Optional[str]]:
+    def _extract_df_from_zonedata(self, directory: str, pattern: str) -> Tuple[pd.DataFrame|dict|None, str|None]:
         file = next(Path(directory).glob(pattern), None)
         if file:
             if pattern == '*.cco':
@@ -88,6 +88,6 @@ class ZoneDataReader:
         else:
             raise FileNotFoundError(f"No file matching pattern {pattern} found in {directory}")    
 
-def get_helmet_zonedata(zonedata_directory: str, zones_filepath: str=None, landcover_filepath: str=None) -> ZoneData:
+def get_helmet_zonedata(zonedata_directory: str, zones_filepath: str|None=None, landcover_filepath: str|None=None) -> ZoneData:
     zondedata_reader = ZoneDataReader(zonedata_directory, zones_filepath=zones_filepath, landcover_filepath=landcover_filepath)
     return zondedata_reader.zonedata()
