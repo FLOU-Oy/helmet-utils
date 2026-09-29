@@ -276,7 +276,6 @@ class ZoneData():
         original_car = self.car
         car = original_car.copy()
         for id, landuse_share in landuse_changes.items():
-            car.loc[id, 'caruse'] = original_car.loc[landuse_share[0], 'caruse']
             car.loc[id, 'cardens'] = original_car.loc[landuse_share[0], 'cardens']
         car = car.sort_index()
         return car
@@ -377,7 +376,7 @@ class ZoneData():
         # CAR
         if car is not None:
             f = open(f"{output_path}/{self.file_dict['car']}", 'w')
-            f.write("# cars of population 31.12.2017\n#\n# caruse: share of population that is car main user\n# cardens: cars per inhabitants\n#\n")
+            f.write("# cars of population 31.12.2017\n#\n# cardens: cars per inhabitants\n#\n")
             car.to_csv(f, float_format='%.4g', sep="\t", lineterminator='\n')
             f.close()
 

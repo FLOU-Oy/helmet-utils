@@ -496,7 +496,7 @@ class ScenarioReader:
             try:
                 columns = lines[6].strip().split()
                 data = [line.strip().split() for line in lines[7:]]
-                df_link_shape = pd.DataFrame(data, columns=columns, sep=r'\s+')
+                df_link_shape = pd.DataFrame(data, columns=columns)
                 return df_link_shape
             except IndexError:
                 return None
